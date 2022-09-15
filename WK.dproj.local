@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2022/09/14 08:34:55.000.005,=d:\Users\toche\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/09/14 08:35:40.000.538,C:\Users\toche\Desktop\WK\uFrmPrincipal.pas=d:\Users\toche\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
+    <Transaction>2022/09/14 08:35:40.000.538,C:\Users\toche\Desktop\WK\uFrmPrincipal.dfm=d:\Users\toche\Documents\Embarcadero\Studio\Projects\Unit1.dfm</Transaction>
+    <Transaction>2022/09/14 08:35:46.000.698,C:\Users\toche\Desktop\WK\WK.dproj=d:\Users\toche\Documents\Embarcadero\Studio\Projects\Project1.dproj</Transaction>
+    <Transaction>2022/09/14 11:03:46.000.959,=C:\Users\toche\Desktop\WK\Unit1.pas</Transaction>
+    <Transaction>2022/09/14 11:04:35.000.048,C:\Users\toche\Desktop\WK\Unit1.dfm=C:\Users\toche\Desktop\WK\DataModule\udmPrincipal.dfm</Transaction>
+    <Transaction>2022/09/14 11:04:35.000.048,C:\Users\toche\Desktop\WK\Unit1.pas=C:\Users\toche\Desktop\WK\DataModule\udmPrincipal.pas</Transaction>
+    <Transaction>2022/09/14 11:26:51.000.100,C:\Users\toche\Desktop\WK\DataModule\udmPrincipal.pas=</Transaction>
+    <Transaction>2022/09/14 18:11:25.939,=C:\Users\toche\Desktop\WK\model.CEP.pas</Transaction>
+  </Transactions>
+</BorlandProject>

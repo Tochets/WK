@@ -1,0 +1,278 @@
+unit uFrmPrincipal;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FireDAC.Stan.Intf, FireDAC.Stan.Option,
+  FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def,
+  FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys, FireDAC.VCLUI.Wait,
+  Data.DB, FireDAC.Comp.Client, Vcl.Grids, Vcl.DBGrids,
+  FireDAC.Phys.PG, FireDAC.Phys.PGDef, FireDAC.Stan.Param, FireDAC.DatS,
+  FireDAC.DApt.Intf, FireDAC.DApt, FireDAC.Comp.DataSet, Vcl.ExtCtrls,
+  Vcl.DBCtrls, Vcl.StdCtrls, Vcl.Mask, Vcl.Buttons;
+
+type
+  TFrmPrincipal = class(TForm)
+    ConPrincipal: TFDConnection;
+    Driver: TFDPhysPgDriverLink;
+    qryPessoa: TFDQuery;
+    dsqryPessoa: TDataSource;
+    lblTitulo: TLabel;
+    qryPessoaflnatureza: TSmallintField;
+    qryPessoadsdocumento: TWideStringField;
+    qryPessoanmprimeiro: TWideStringField;
+    qryPessoanmsegundo: TWideStringField;
+    qryPessoadtregistro: TDateField;
+    qryPessoadscep: TWideStringField;
+    qryPessoadsuf: TWideStringField;
+    qryPessoanmcidade: TWideStringField;
+    qryPessoanmbairro: TWideStringField;
+    qryPessoanmlogradouro: TWideStringField;
+    qryPessoadscomplemento: TWideStringField;
+    qryPessoaidpessoa: TLargeintField;
+    navPessoa: TDBNavigator;
+    dbPrincipal: TDBGrid;
+    qryAux: TFDQuery;
+    qryPessoaidendereco: TLargeintField;
+    qryPessoaidpessoa_1: TLargeintField;
+    qryPessoaidendereco_1: TLargeintField;
+    memajudaLote: TMemo;
+    SpeedButton1: TSpeedButton;
+    procedure FormCreate(Sender: TObject);
+    function SomenteNumero(Texto: string): string;
+    procedure navPessoaClick(Sender: TObject; Button: TNavigateBtn);
+    procedure dbPrincipalColEnter(Sender: TObject);
+    procedure dbPrincipalKeyPress(Sender: TObject; var Key: Char);
+    procedure qryPessoaAfterPost(DataSet: TDataSet);
+    function Preencher(Texto: String; Qtd: Integer; Com: String = ' '; Posicao: String = 'D'): String;
+    procedure SpeedButton1Click(Sender: TObject);
+  private
+    { Private declarations }
+  public
+    { Public declarations }
+  end;
+
+var
+  FrmPrincipal: TFrmPrincipal;
+
+implementation
+
+
+{$R *.dfm}
+
+uses model.CEP;
+
+procedure TFrmPrincipal.dbPrincipalColEnter(Sender: TObject);
+begin
+  if dbPrincipal.SelectedIndex = 0 then
+    dbPrincipal.SelectedIndex := 1;
+  if (dbPrincipal.SelectedIndex = 4) or (dbPrincipal.SelectedIndex > 5)then
+    dbPrincipal.SelectedIndex := 5;
+end;
+
+procedure TFrmPrincipal.dbPrincipalKeyPress(Sender: TObject; var Key: Char);
+var sCEP : String;
+    Endereco: TStringList;
+    EnderecoApi : TEnderecoApi;
+begin
+  case dbPrincipal.SelectedIndex of
+    1 : begin
+        if KEY = #13 then
+        begin
+          if qryPessoanmprimeiro.AsString = '' then
+          begin
+            showmessage('Por favor digite o primeiro nome');
+            abort;
+          end;
+          dbPrincipal.SelectedIndex := 2;
+        end;
+    end;
+    2 : begin
+        if KEY = #13 then
+        begin
+          if qryPessoanmsegundo.AsString = '' then
+          begin
+            showmessage('Por favor digite o sobrenome');
+            abort;
+          end;
+          dbPrincipal.SelectedIndex := 3;
+        end;
+    end;
+    3 : begin
+        if KEY = #13 then
+        begin
+          if qryPessoadsdocumento.AsString = '' then
+          begin
+            showmessage('Por favor digite o documento');
+            abort;
+          end;
+          dbPrincipal.SelectedIndex := 5;
+        end;
+    end;
+    5 : begin
+        if KEY = #13 then
+        begin
+          sCEP := SomenteNumero(qryPessoadscep.Text);
+          if Length(trim(sCEP)) <> 8 then
+          begin
+            Showmessage('CEP inválido.');
+            dbPrincipal.SelectedIndex := 5;
+            abort;
+          end;
+          EnderecoApi := TEnderecoApi.Create;
+          BuscarCEP(sCEP, EnderecoApi);
+          qryPessoanmlogradouro.AsString := EnderecoApi.Logradouro;
+          qryPessoadscomplemento.AsString := EnderecoApi.Complemento;
+          qryPessoanmBairro.AsString := EnderecoApi.Bairro;
+          qryPessoanmcidade.AsString := EnderecoApi.Localidade;
+          qryPessoadsuf.AsString := EnderecoApi.UF;
+          FreeAndNil(EnderecoApi);
+          dbPrincipal.SelectedIndex := 5;
+        end;
+    end;
+  end;
+end;
+
+procedure TFrmPrincipal.FormCreate(Sender: TObject);
+begin
+  Driver.VendorHome := ExtractFilePath(Application.ExeName);
+  qryPessoa.Open;
+end;
+
+procedure TFrmPrincipal.navPessoaClick(Sender: TObject; Button: TNavigateBtn);
+begin
+ if Button = nbInsert then
+ begin
+   with qryAux do
+   begin
+     close; sql.clear;
+     sql.add('select max(idpessoa) as Seq from pessoa ');
+     Prepare;
+     open;
+     if FieldByName('Seq').Text = '' then
+       qryPessoaidpessoa.AsInteger := 1
+     else
+       qryPessoaidpessoa.AsInteger := FieldByName('Seq').AsInteger+1;
+     qryPessoaidpessoa_1.AsInteger := qryPessoaidpessoa.AsInteger;
+     qryPessoaidendereco.AsInteger := qryPessoaidpessoa.AsInteger;
+     qryPessoaidendereco_1.AsInteger := qryPessoaidpessoa.AsInteger;
+     qryPessoadtregistro.AsDateTime := now();
+
+     qryPessoaflnatureza.AsInteger := 1;
+     dbPrincipal.SetFocus;
+     dbPrincipal.SelectedIndex := 1;
+     close; sql.clear;
+   end;
+ end;
+end;
+
+procedure TFrmPrincipal.qryPessoaAfterPost(DataSet: TDataSet);
+begin
+  with qryAux do
+   begin
+     close; sql.clear;
+     sql.add('select * from pessoa where idpessoa = :id ');
+     parambyname('id').AsInteger :=  qryPessoaidpessoa.AsInteger;
+     Prepare;
+     open;
+     if isempty then
+     begin
+       close; sql.Clear;
+       sql.Add('insert into pessoa values (:id, :natureza, :, :nome, :sobrenome, :data) ');
+       Parambyname('id').AsInteger := qryPessoaidpessoa.AsInteger;
+       Parambyname('natureza').AsInteger := qryPessoaflnatureza.AsInteger;
+       Parambyname('nome').AsString := qryPessoanmprimeiro.AsString;
+       Parambyname('sobrenome').AsString := qryPessoanmsegundo.AsString;
+       Parambyname('data').AsDateTime := qryPessoadtregistro.AsDateTime;
+       prepare;
+       ExecSql;
+     end;
+     close; sql.clear;
+     sql.add('select * from endereco where idpessoa = :id ');
+     parambyname('id').AsInteger :=  qryPessoaidpessoa.AsInteger;
+     Prepare;
+     open;
+     if isempty then
+     begin
+       close; sql.Clear;
+       sql.Add('insert into endereco values (:id, :idpessoa, :cep) ');
+       Parambyname('id').AsInteger := qryPessoaidpessoa.AsInteger;
+       Parambyname('idpessoa').AsInteger := qryPessoaidpessoa.AsInteger;
+       Parambyname('cep').AsString := qryPessoadscep.AsString;
+       prepare;
+       ExecSql;
+     end;
+     close; sql.clear;
+     sql.add('select * from endereco_integracao where idendereco = :id');
+     parambyname('id').AsInteger :=  qryPessoaidendereco.AsInteger;
+     Prepare;
+     open;
+     if isempty then
+     begin
+       close; sql.Clear;
+       sql.Add('insert into endereco_integracao values (:id, :uf, :cidade, :bairro, :logradouro, :complemento) ');
+       Parambyname('id').AsInteger := qryPessoaidpessoa.AsInteger;
+       Parambyname('uf').AsString := qryPessoadsuf.AsString;
+       Parambyname('cidade').AsString := qryPessoanmcidade.AsString;
+       Parambyname('bairro').AsString := qryPessoanmbairro.AsString;
+       Parambyname('logradouro').AsString := qryPessoadsuf.AsString;
+       Parambyname('complemento').AsString := qryPessoadsuf.AsString;
+       prepare;
+       ExecSql;
+     end;
+     close; sql.clear;
+   end;
+end;
+
+function TFrmPrincipal.SomenteNumero(Texto: string): string;
+var
+  i  : Integer;
+  Aux: string;
+begin
+  Aux   := '';
+  for i := 1 to Length(Texto) do
+  begin
+    if CharInSet(Texto[i], ['0' .. '9']) then
+      Aux := Aux + Texto[i];
+  end;
+  Result := Aux;
+end;
+
+procedure TFrmPrincipal.SpeedButton1Click(Sender: TObject);
+begin
+  if MessageDlg('Este procedimento vai incluir 50000 novos registros no banco de dados!'+#13+
+                'Pode ser que demore um pouco.+#13+' +
+                'Deseja continuar?', mtConfirmation, [mbYes, mbNo], 0) = mrYes then
+  begin
+
+  end;
+end;
+
+function TFrmPrincipal.Preencher(Texto: String; Qtd: Integer; Com: String = ' '; Posicao: String = 'D'): String;
+var
+  Tam, i: Integer;
+  Aux   : String;
+begin
+  if Length(Texto) = 0 then
+    Tam := Qtd
+  else
+    Tam := Qtd - Length(Texto);
+
+  if Length(Texto) >= Qtd then
+    Result := Copy(Texto, 1, Qtd)
+  else
+  begin
+    Aux   := Texto;
+    for i := 1 to Tam do
+    begin
+      if Posicao = 'D' then
+        Aux := Aux + Com
+      else
+        Aux := Com + Aux;
+    end;
+    Result := Aux;
+  end;
+end;
+
+end.

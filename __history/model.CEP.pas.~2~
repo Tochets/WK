@@ -1,0 +1,220 @@
+unit model.CEP;
+
+interface
+
+uses
+  REST.Response.Adapter, REST.Client, REST.Types, System.JSON;
+
+type
+  TEvRetorno  = procedure(Value: String) of object;
+  TEvEndereco = procedure(estado, cidade, bairro, logradouro: String) of object;
+
+  ICEP = interface
+    ['{36F137A6-31B3-4B70-84F8-AC89F00A637F}']
+    function Retorno(Value: TEvRetorno): ICEP;
+    function Endereco(Value: TEvEndereco): ICEP;
+    function buscarEndereco(CEP: String): ICEP;
+    function getDDD(CEP: String): ICEP;
+  end;
+
+  TCEP = class(TInterfacedObject, ICEP)
+  private
+    FClient  : TRESTClient;
+    FReq     : TRESTRequest;
+    FResp    : TRESTResponse;
+    FRetorno : TEvRetorno;
+    FEndereco: TEvEndereco;
+    procedure ClientCreate;
+    procedure ResponseCreate;
+    procedure RequestCreate;
+    procedure setRequestParameters(BaseUrl: String; RequestKind: TRESTRequestParameterKind;
+      Method: TRESTRequestMethod);
+    function getJsonValue(JsonObject: TJSONObject; parameter: String): String;
+    constructor Create;
+  public
+    destructor Destroy; override;
+    class function New: ICEP;
+    function Retorno(Value: TEvRetorno): ICEP;
+    function Endereco(Value: TEvEndereco): ICEP;
+    function buscarEndereco(CEP: String): ICEP;
+    function getDDD(CEP: String): ICEP;
+  end;
+
+implementation
+
+uses
+  System.SysUtils, System.Classes;
+
+{ TCEP }
+
+procedure TCEP.ClientCreate;
+begin
+  FClient                         := TRESTClient.Create(nil);
+  FClient.FallbackCharsetEncoding := 'UTF-8';
+end;
+
+constructor TCEP.Create;
+begin
+  ClientCreate;
+  FResp := TRESTResponse.Create(nil);
+  RequestCreate;
+end;
+
+destructor TCEP.Destroy;
+begin
+  if Assigned(FClient) then
+    FreeAndNil(FClient);
+  if Assigned(FReq) then
+  begin
+    FReq.Params.Clear;
+    FreeAndNil(FReq);
+  end;
+
+  if Assigned(FResp) then
+    FreeAndNil(FResp);
+  inherited;
+end;
+
+function TCEP.Endereco(Value: TEvEndereco): ICEP;
+begin
+  Result    := Self;
+  FEndereco := Value;
+end;
+
+function TCEP.buscarEndereco(CEP: String): ICEP;
+var
+  obj                               : TJSONObject;
+  estado, cidade, bairro, logradouro: String;
+begin
+  Result := Self;
+
+  setRequestParameters('https://brasilapi.com.br/api/cep/v1', pkGETorPOST, rmGET);
+
+  FReq.Resource                            := '/{cep}';
+  FReq.Params.Items[0].Kind                := pkURLSEGMENT;
+  FReq.Params.Items[0].name                := 'cep';
+  FReq.Params.Items[0].Options             := [poAutoCreated];
+  FReq.Params.ParameterByName('cep').Value := CEP;
+
+  try
+    FReq.Execute;
+  except
+    on E: Exception do
+{$IFDEF DEBUG}
+      raise Exception.Create(FResp.StatusCode.ToString + ' - ' + sLineBreak + E.Message);
+{$ENDIF}
+  end;
+
+  if FResp.Status.Success then
+  begin
+    try
+      obj        := TJSONObject.ParseJSONValue(FResp.Content) as TJSONObject;
+      estado     := getJsonValue(obj, 'state');
+      cidade     := getJsonValue(obj, 'city');
+      bairro     := getJsonValue(obj, 'neighborhood');
+      logradouro := getJsonValue(obj, 'street');
+      FEndereco(estado, cidade, bairro, logradouro);
+    finally
+      obj.Free;
+    end;
+  end;
+end;
+
+function TCEP.getDDD(CEP: String): ICEP;
+var
+  obj: TJSONObject;
+  ddd, url: String;
+begin
+
+  Result := Self;
+
+  setRequestParameters('https://viacep.com.br/ws', pkGETorPOST, rmGET);
+
+  FReq.Resource                            := '/{cep}/json/';
+  FReq.Params.Items[0].Kind                := pkURLSEGMENT;
+  FReq.Params.Items[0].name                := 'cep';
+  FReq.Params.Items[0].Options             := [poAutoCreated];
+  FReq.Params.ParameterByName('cep').Value := CEP;
+
+  url := FReq.GetFullRequestURL;
+
+  try
+    FReq.Execute;
+
+    if FResp.Status.Success then
+    begin
+      try
+        obj := TJSONObject.ParseJSONValue(FResp.Content) as TJSONObject;
+
+        ddd := EmptyStr;
+
+        { Este try exception é necessário pois a api apresenta um erro ao não encontrar 
+          o cep e retorna um status 200 
+          Exemplo: https://viacep.com.br/ws/32400000/json/ }
+        try
+          ddd := getJsonValue(obj, 'ddd');
+        except
+          on E: Exception do
+            ddd := EmptyStr;
+        end;
+
+        FRetorno(ddd);
+      finally
+        obj.Free;
+      end;
+    end;
+
+  except
+    on E: Exception do
+{$IFDEF DEBUG}
+      raise Exception.Create(FResp.StatusCode.ToString + ' - ' + sLineBreak + E.Message);
+{$ENDIF}
+  end;
+
+end;
+
+function TCEP.getJsonValue(JsonObject: TJSONObject; parameter: String): String;
+begin
+  Result := StringReplace(JsonObject.GetValue(parameter).ToString, '"', '', [rfReplaceAll]);
+end;
+
+class function TCEP.New: ICEP;
+begin
+  Result := Self.Create;
+end;
+
+procedure TCEP.RequestCreate;
+begin
+  FReq               := TRESTRequest.Create(nil);
+  FReq.Accept        := 'application/json, text/plain; q=0.9, text/html;q=0.8,';
+  FReq.AcceptCharset := 'UTF-8, *;q=0.8';
+  FReq.Client        := FClient;
+  FReq.Response      := FResp;
+  FReq.Timeout       := 20000;
+end;
+
+procedure TCEP.ResponseCreate;
+begin
+  FResp                         := TRESTResponse.Create(nil);
+  FResp.BindSource.AutoActivate := True;
+  FResp.BindSource.AutoEdit     := True;
+  FResp.BindSource.AutoPost     := True;
+end;
+
+function TCEP.Retorno(Value: TEvRetorno): ICEP;
+begin
+  Result   := Self;
+  FRetorno := Value;
+end;
+
+procedure TCEP.setRequestParameters(BaseUrl: String; RequestKind: TRESTRequestParameterKind;
+  Method: TRESTRequestMethod);
+begin
+  FClient.BaseUrl := BaseUrl;
+  FReq.AddParameter('Content-Type', 'application/json', RequestKind, [poDoNotEncode]);
+  FReq.AddParameter('Accept', 'application/json', RequestKind, [poDoNotEncode]);
+  FReq.Params.Clear;
+  FReq.Method := Method;
+end;
+
+end.

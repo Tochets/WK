@@ -1,0 +1,73 @@
+unit model.CEP;
+interface
+uses
+  System.JSON, System.Classes, REST.Client, System.SysUtils;
+
+  TEnderecoApi = class
+    public
+      Logradouro  : String;
+      Complemento : String;
+      Bairro      : String;
+      Localidade  : String;
+      UF          : String;
+      IBGE        : String;
+      GIA         : String;
+      DDD         : String;
+      SIAFI       : String;
+  end;
+
+      "cep": "01001-000",
+      "logradouro": "Praça da Sé",
+      "complemento": "lado ímpar",
+      "bairro": "Sé",
+      "localidade": "São Paulo",
+      "uf": "SP",
+      "ibge": "3550308",
+      "gia": "1004",
+      "ddd": "11",
+      "siafi": "7107"
+
+  function BuscarCEP(sCEP: string): TStringList;
+
+
+implementation
+
+//uses  unConstants;
+
+function BuscarCEP(sCEP: string): TStringList;
+var
+  RESTClient1: TRESTClient;
+  RESTRequest1: TRESTRequest;
+  RESTResponse1: TRESTResponse;
+  data: TJSONObject;
+  Endereco: TStringList;
+begin
+  RESTClient1 := TRESTClient.Create(nil);
+  RESTRequest1 := TRESTRequest.Create(nil);
+  RESTResponse1 := TRESTResponse.Create(nil);
+  RESTRequest1.Client := RESTClient1;
+  RESTRequest1.Response := RESTResponse1;
+  RESTClient1.BaseURL := 'https://viacep.com.br/ws/' + sCEP + '/json';
+  RESTRequest1.Execute;
+  data := RESTResponse1.JSONValue as TJSONObject;
+  try
+    Endereco := TStringList.Create;
+    if Assigned(data) then
+    begin
+      try Endereco.Add(data.Values['logradouro'].Value); except Endereco.Add(''); end;
+      try Endereco.Add(data.Values['bairro'].Value);     except Endereco.Add(''); end;
+      try Endereco.Add(data.Values['uf'].Value);         except Endereco.Add(''); end;
+      try Endereco.Add(data.Values['localidade'].Value); except Endereco.Add(''); end;
+      try Endereco.Add(data.Values['complemento'].Value);except Endereco.Add(''); end;
+      try Endereco.Add(data.Values['complemento'].Value);except Endereco.Add(''); end;
+
+
+
+    end;
+  finally
+    FreeAndNil(data);
+  end;
+  Result := Endereco;
+end;
+
+end.
